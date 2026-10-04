@@ -1,0 +1,16 @@
+{
+  "name": "lernquest",
+  "version": "1.0.0",
+  "private": true,
+  "description": "LernQuest – Lern-PWA für Emma & Hannah (Deutsch, Mathe, Englisch)",
+  "main": "server/index.js",
+  "type": "commonjs",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "start": "node server/index.js",
+    "dev": "DATA_DIR=./data FAMILY_PASSWORD=test1234 AI_MOCK=1 SESSION_SECRET=dev-secret-change-me COOKIE_SECURE=0 node server/index.js"
+  },
+  "dependencies": {
+    "express": "^4.21.2"
+  }
+}

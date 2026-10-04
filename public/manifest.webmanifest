@@ -1,0 +1,17 @@
+{
+  "name": "LernQuest – Emma & Hannah",
+  "short_name": "LernQuest",
+  "description": "Deutsch, Mathe und Englisch üben – mit Schularbeit-Training",
+  "lang": "de-AT",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#EEF3FF",
+  "theme_color": "#7C5CFF",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
