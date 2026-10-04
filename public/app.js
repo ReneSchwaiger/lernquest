@@ -275,7 +275,7 @@ const xpFor=l=>40*(l-1)*(l-1);
 const TITLES=['Entdecker:in','Schlaukopf','Rätselprofi','Wissensjäger:in','Superhirn','Meister:in','Legende'];
 const titleOf=l=>TITLES[Math.min(TITLES.length-1,Math.floor((l-1)/3))];
 function defKid(id){return {xp:0,coins:0,streak:0,lastDay:'',dayXp:{},badges:[],stats:{},sessions:[],exams:[],ava:KIDS[id].ava,owned:[KIDS[id].ava],totalCorrect:0,bestCombo:0}}
-function normKid(id,d){const base=defKid(id);d=Object.assign(base,d||{});for(const k of ['badges','sessions','exams','owned'])if(!Array.isArray(d[k]))d[k]=base[k];if(typeof d.stats!=='object'||!d.stats)d.stats={};if(typeof d.dayXp!=='object'||!d.dayXp)d.dayXp={};return d}
+function normKid(id,d){const base=defKid(id);d=Object.assign(base,d||{});if(typeof d.school!=='object'||!d.school||Array.isArray(d.school))d.school={};for(const k of ['badges','sessions','exams','owned'])if(!Array.isArray(d[k]))d[k]=base[k];if(typeof d.stats!=='object'||!d.stats)d.stats={};if(typeof d.dayXp!=='object'||!d.dayXp)d.dayXp={};return d}
 
 /* ============ State & Storage (eigener Server) ============ */
 const S={screen:'boot',kid:null,subj:null,quiz:null,parentKid:'emma',parent:false,pinIn:'',online:navigator.onLine,muted:lsGet('lq_muted',false),
@@ -346,7 +346,7 @@ function toast(msg){const t=document.createElement('div');t.className='toast';t.
 function go(screen,extra){Object.assign(S,extra||{});S.screen=screen;render();window.scrollTo(0,0)}
 function render(){
   document.body.dataset.kid=S.kid||'';
-  const f={boot:vBoot,login:vLogin,home:vHome,kid:vKid,subject:vSubject,quiz:vQuiz,result:vResult,badges:vBadges,shop:vShop,examSetup:vExamSetup,aiLoading:vAiLoading,pin:vPin,parent:vParent}[S.screen]||vHome;
+  const f={pModules:vPModules,boot:vBoot,login:vLogin,home:vHome,kid:vKid,subject:vSubject,quiz:vQuiz,result:vResult,badges:vBadges,shop:vShop,examSetup:vExamSetup,aiLoading:vAiLoading,pin:vPin,parent:vParent}[S.screen]||vHome;
   $app.innerHTML=(!S.online&&S.screen!=='login'&&S.screen!=='boot'?'<div class="offline">Offline – du kannst weiter üben, gespeichert wird, sobald wieder Internet da ist.</div>':'')+f();
   const a=$app.querySelector('[autofocus]');if(a&&!('ontouchstart' in window))a.focus();
 }
@@ -381,7 +381,7 @@ function stars(st){if(!st||st.t<3)return '☆☆☆';const r=st.c/st.t;return r>
 function vSubject(){
   const d=S.data[S.kid],list=TOPICS[S.kid][S.subj];
   const base=list.filter(t=>!t.profi),pro=list.filter(t=>t.profi);
-  const row=t=>{const st=d.stats[S.subj+':'+t.k];return `<button class="topic" data-a="startTopic" data-k="${t.k}"><span class="t">${t.t}${t.profi?'<span class="profi-tag">Profi</span>':''}<small>${st?`${st.t} Aufgaben · ${Math.round(st.c/st.t*100)} %`:'Neu'}</small></span><span class="stars">${stars(st)}</span></button>`};
+  const row=t=>{const st=d.stats[S.subj+':'+t.k];const sc=(d.school||{})[S.subj+':'+t.k];return `<button class="topic" data-a="startTopic" data-k="${t.k}"><span class="t">${t.t}${t.profi?'<span class="profi-tag">Profi</span>':''}${sc==='aktuell'?'<span class="school-tag now">📚 gerade in der Schule</span>':''}<small>${st?`${st.t} Aufgaben · ${Math.round(st.c/st.t*100)} %`:'Neu'}</small></span><span class="stars">${stars(st)}</span></button>`};
   const ai=S.ai.enabled&&S.online?aiLeft(S.kid):null;
   return `${topBar(SUBJ[S.subj].e+' '+SUBJ[S.subj].t,'kid')}
   <div class="card ai-card"><h3>✨ KI-Aufgaben</h3><p class="muted" style="margin:6px 0 12px">Claude erfindet neue Aufgaben genau für dein Niveau. Wähle ein Thema – oder schreib, was in der Schule gerade dran ist.</p>
@@ -437,6 +437,27 @@ function vExamSetup(){
 function vAiLoading(){return `<div class="loading"><div class="spinner">${pick(['🧠','✨','🚀','🦉'])}</div><h2 style="margin-top:14px">${esc(S.aiMsg||'Claude denkt nach …')}</h2><p class="muted">Das dauert meistens 10–40 Sekunden.</p><button class="btn ghost small" data-a="cancelAI">Abbrechen</button></div>`}
 function vPin(){return `${topBar('Eltern-Bereich','home')}<div class="card" style="text-align:center"><h3>PIN eingeben</h3><p class="muted">${S.settings.pinIsDefault?'Standard-PIN: 1234 – bitte im Eltern-Bereich ändern.':'Nur für Eltern.'}</p><div class="pin">${[0,1,2,3].map(i=>`<span class="${S.pinIn.length>i?'on':''}"></span>`).join('')}</div>
   <div class="pad">${[1,2,3,4,5,6,7,8,9,'',0,'⌫'].map(n=>n===''?'<span></span>':`<button data-a="pin" data-v="${n}">${n}</button>`).join('')}</div></div>`}
+const SCHOOL_STATES=[['','–','Noch nicht in der Schule'],['aktuell','📚 aktuell','Wird gerade in der Schule durchgenommen'],['erledigt','✓ erledigt','In der Schule schon abgeschlossen']];
+function lastOf(d,subj,t){const st=d.stats[subj+':'+t.k];if(st&&st.last)return st.last;const s=d.sessions.find(x=>x.subj===subj&&((x.keys&&x.keys.includes(t.k))||String(x.label||'').startsWith(t.t)));return s?s.day:''}
+function vPModules(){
+  if(!S.parent){setTimeout(()=>go('pin'));return ''}
+  const id=S.parentKid,d=S.data[id],subj=S.pSubj||'mathe',list=TOPICS[id][subj];
+  const rows=list.map(t=>{const sk=subj+':'+t.k,st=d.stats[sk],sc=(d.school||{})[sk]||'',last=lastOf(d,subj,t);const r=st?st.c/st.t:null;
+    const gap=sc&&!st;const ago=last?daysBetween(last,today()):null;
+    return `<tr class="${gap?'gap':''}"><td class="mod">${esc(t.t)}${t.profi?' <span class="profi-tag">Profi</span>':''}</td>
+    <td><button class="school-btn s-${sc||'none'}" data-a="school" data-k="${sk}" title="${SCHOOL_STATES.find(x=>x[0]===sc)[2]} – tippen zum Ändern">${SCHOOL_STATES.find(x=>x[0]===sc)[1]}</button></td>
+    <td>${st?st.t:'<span class="muted">–</span>'}</td>
+    <td>${r==null?'<span class="muted">–</span>':`<b style="color:${r>=.85?'var(--mintDeep)':r>=.65?'var(--sunDeep)':'var(--berry)'}">${Math.round(r*100)} %</b>`}</td>
+    <td>${last?(ago===0?'heute':ago===1?'gestern':`vor ${ago} Tagen`):'<span class="muted">nie</span>'}</td></tr>`}).join('');
+  const custom=Object.entries(d.stats).filter(([k])=>k.startsWith(subj+':ai_')).map(([k,v])=>`<tr><td class="mod">✨ ${esc(k.slice(subj.length+4))}</td><td></td><td>${v.t}</td><td>${Math.round(v.c/v.t*100)} %</td><td>${v.last?new Date(v.last+'T00:00').toLocaleDateString('de-AT'):''}</td></tr>`).join('');
+  const done=list.filter(t=>d.stats[subj+':'+t.k]).length,gaps=list.filter(t=>(d.school||{})[subj+':'+t.k]&&!d.stats[subj+':'+t.k]).length;
+  return `${topBar('Modul-Übersicht','parent')}
+  <div class="seg" style="margin-bottom:10px">${['emma','hannah'].map(k=>`<button data-a="pKid" data-id="${k}" class="${id===k?'on':''}">${S.data[k].ava} ${KIDS[k].name}</button>`).join('')}</div>
+  <div class="seg" style="margin-bottom:14px">${Object.keys(SUBJ).map(s=>`<button data-a="pSubj" data-s="${s}" class="${subj===s?'on':''}">${SUBJ[s].e} ${SUBJ[s].t}</button>`).join('')}</div>
+  <div class="card"><div class="spread" style="flex-wrap:wrap"><b>${done} von ${list.length} Modulen geübt</b>${gaps?`<span class="chip" style="border-color:var(--berry)">⚠️ ${gaps} in der Schule, aber noch nicht geübt</span>`:''}</div>
+  <p class="note" style="margin:6px 0 12px">Spalte „Schule“ antippen: – → 📚 aktuell → ✓ erledigt. Module mit „aktuell“ sieht ${KIDS[id].name} auch in der App markiert.${bookOf(id,subj)?` Schulbuch: ${esc(bookOf(id,subj))}.`:''}</p>
+  <div class="tablewrap"><table class="modtable"><tr><th>Modul</th><th>Schule</th><th>Aufgaben</th><th>Richtig</th><th>Zuletzt</th></tr>${rows}${custom?`<tr><th colspan="5" style="padding-top:16px">Eigene KI-Themen</th></tr>${custom}`:''}</table></div></div>`;
+}
 function vParent(){
   if(!S.parent){setTimeout(()=>go('pin'));return ''}
   const id=S.parentKid,d=S.data[id],K=KIDS[id];
@@ -452,6 +473,7 @@ function vParent(){
   <div class="card"><h3>${K.name} · ${K.grade}</h3><p class="muted" style="margin:2px 0 12px">Niveau: Mathe ${K.levels.mathe}, Deutsch ${K.levels.deutsch}, Englisch ${K.levels.englisch}</p>
   <div class="kpis"><div class="kpi"><b>${levelOf(d.xp)}</b><span>Level (${d.xp} XP)</span></div><div class="kpi"><b>${curStreak(d)}</b><span>Tage-Serie</span></div><div class="kpi"><b>${week.length}</b><span>Übungen (7 Tage)</span></div><div class="kpi"><b>${totT?Math.round(totC/totT*100)+' %':'–'}</b><span>Trefferquote gesamt</span></div></div></div>
   <div class="card" style="margin-top:14px"><h3 style="margin-bottom:10px">Aktivität (14 Tage, XP)</h3><div style="display:flex;align-items:flex-end;gap:4px;height:110px">${last14.map(x=>`<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;height:100%;justify-content:flex-end"><div title="${x.v} XP" style="width:100%;border-radius:6px 6px 2px 2px;background:${x.v>=DAILY_GOAL?'var(--mint)':'var(--sky)'};height:${Math.max(2,x.v/mx*90)}px"></div><span style="font-size:.65rem;color:var(--muted)">${x.lbl}</span></div>`).join('')}</div><p class="note" style="margin:8px 0 0">Grün = Tagesziel (${DAILY_GOAL} XP) erreicht</p></div>
+  <div class="card" style="margin-top:14px"><div class="spread" style="margin-bottom:10px"><h3>Module</h3><button class="btn small" data-a="go" data-to="pModules">📋 Übersicht öffnen</button></div>${Object.keys(SUBJ).map(s=>{const L=TOPICS[id][s];const done=L.filter(t=>d.stats[s+':'+t.k]).length;const now=L.filter(t=>(d.school||{})[s+':'+t.k]==='aktuell').map(t=>t.t);return `<div class="bar" style="grid-template-columns:90px 1fr auto"><span>${SUBJ[s].t}</span><div class="track"><i style="width:${done/L.length*100}%;background:var(--sky)"></i></div><span class="muted" style="font-size:.85rem">${done}/${L.length} geübt</span></div>${now.length?`<div class="note" style="margin:2px 0 8px 100px">📚 Schule aktuell: ${esc(now.join(', '))}</div>`:''}`}).join('')}</div>
   <div class="card" style="margin-top:14px"><h3 style="margin-bottom:12px">Fächer</h3>${Object.keys(SUBJ).map(s=>{const a=subjAcc(d,s);return `<div class="bar"><span>${SUBJ[s].t}</span><div class="track"><i style="width:${a==null?0:a*100}%;background:${a==null?'transparent':col(a)}"></i></div><span>${a==null?'–':Math.round(a*100)+' %'}</span></div>`}).join('')}</div>
   <div class="card stack" style="margin-top:14px"><h3>Hier braucht ${K.name} Übung</h3>${weak.length?weak.slice(0,6).map(r=>`<div class="bar" style="grid-template-columns:1fr 70px 48px"><span>${SUBJ[r.s].e} ${esc(r.t)}</span><span class="muted" style="font-size:.85rem">${r.n} Aufg.</span><span style="color:var(--berry)">${Math.round(r.r*100)} %</span></div>`).join(''):'<p class="muted">Noch keine Schwachstellen erkennbar (ab 5 Aufgaben pro Thema mit unter 70 %).</p>'}
   ${strong.length?`<h3>Das sitzt</h3>${strong.slice(0,5).map(r=>`<div class="muted">✅ ${SUBJ[r.s].e} ${esc(r.t)} – ${Math.round(r.r*100)} %</div>`).join('')}`:''}</div>
@@ -487,10 +509,10 @@ function finishQuiz(){
   d.xp+=xp;d.coins+=coins;d.totalCorrect+=Q.correct;d.bestCombo=Math.max(d.bestCombo||0,Q.bestCombo);d.dayXp[t]=(d.dayXp[t]||0)+xp;
   const dk=Object.keys(d.dayXp).sort();if(dk.length>60)for(const k of dk.slice(0,dk.length-60))delete d.dayXp[k];
   if(d.lastDay!==t){d.streak=d.lastDay&&daysBetween(d.lastDay,t)===1?d.streak+1:1;d.lastDay=t}
-  for(const [k,v] of Object.entries(Q.perKey)){const sk=Q.subj+':'+k;d.stats[sk]=d.stats[sk]||{c:0,t:0};d.stats[sk].c+=v.c;d.stats[sk].t+=v.t}
+  for(const [k,v] of Object.entries(Q.perKey)){const sk=Q.subj+':'+k;d.stats[sk]=d.stats[sk]||{c:0,t:0};d.stats[sk].c+=v.c;d.stats[sk].t+=v.t;d.stats[sk].last=t}
   const pct=Q.correct/total;const grade=Q.examId!=null?(pct>=.88?1:pct>=.75?2:pct>=.62?3:pct>=.5?4:5):null;
   if(Q.examId){const e=d.exams.find(x=>x.id===Q.examId);if(e)e.best=e.best==null?grade:Math.min(e.best,grade)}
-  d.sessions.unshift({day:t,subj:Q.subj,label:Q.label,c:Q.correct,t:total,ai:!!Q.isAI,grade});d.sessions=d.sessions.slice(0,60);
+  d.sessions.unshift({day:t,subj:Q.subj,keys:Object.keys(Q.perKey),label:Q.label,c:Q.correct,t:total,ai:!!Q.isAI,grade});d.sessions=d.sessions.slice(0,60);
   const subjs=new Set(d.sessions.map(s=>s.subj));
   const earn=[];const give=k=>{if(!d.badges.includes(k)){d.badges.push(k);earn.push(BADGES.find(b=>b.k===k))}};
   give('first');if(pct===1)give('perfect');if(Q.bestCombo>=5)give('combo5');if(Q.bestCombo>=10)give('combo10');if(d.streak>=3)give('streak3');if(d.streak>=7)give('streak7');if(d.totalCorrect>=100)give('c100');if(d.totalCorrect>=500)give('c500');if(Q.profi&&pct>=.8)give('profi');if(grade&&grade<=2)give('exam');if(Q.isAI)give('ai');if(subjs.size>=3)give('all3');
@@ -575,6 +597,9 @@ document.addEventListener('click',async ev=>{
    case 'logout':{if(!(await ask('Dieses Gerät abmelden?',{ok:'Abmelden'})))break;await api('POST','/api/logout').catch(()=>{});S.parent=false;go('login');break}
    case 'lockParent':{await api('POST','/api/parent/lock').catch(()=>{});S.parent=false;go('home');break}
    case 'pKid':S.parentKid=el.dataset.id;render();break;
+   case 'pSubj':S.pSubj=el.dataset.s;render();break;
+   case 'parent':go('parent');break;
+   case 'school':{const d=S.data[S.parentKid];d.school=d.school||{};const k=el.dataset.k;const order=SCHOOL_STATES.map(x=>x[0]);const nx=order[(order.indexOf(d.school[k]||'')+1)%order.length];if(nx)d.school[k]=nx;else delete d.school[k];saveKid(S.parentKid);render();break}
    case 'addExam':{const subj=document.getElementById('pSubj').value,date=document.getElementById('pDate').value,note=document.getElementById('pNote').value.trim();if(!date){toast('Bitte ein Datum wählen.');break}S.data[S.parentKid].exams.push({id:uid(),subj,date,note,topics:[]});saveKid(S.parentKid);toast('Schularbeit eingetragen');render();break}
    case 'delExam':{if(!(await ask('Diese Schularbeit entfernen?',{ok:'Entfernen'})))break;const d=S.data[S.parentKid];d.exams=d.exams.filter(x=>x.id!==el.dataset.id);saveKid(S.parentKid);render();break}
    case 'saveBooks':{const b={};b[S.parentKid]={};for(const sb of Object.keys(SUBJ))b[S.parentKid][sb]=document.getElementById('bk_'+sb).value.trim();try{const r=await api('PUT','/api/settings',{books:b});S.settings.books=r.books;lsSet('lq_settings',S.settings);toast('Bücher gespeichert');render()}catch(e){parentErr(e)}break}

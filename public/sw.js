@@ -1,5 +1,5 @@
 // LernQuest Service Worker: App-Shell offline, API immer übers Netz.
-const VERSION = 'lq-1.0.1';
+const VERSION = 'lq-1.0.2';
 const SHELL = ['/', '/index.html', '/styles.css', '/app.js', '/manifest.webmanifest',
   '/icons/icon-192.png', '/icons/icon-512.png', '/icons/apple-touch-icon.png', '/brand/schwaiger-logo.png', '/brand/schwaiger-logo-light.png',
   '/fonts/baloo-2-latin-500-normal.woff2', '/fonts/baloo-2-latin-700-normal.woff2', '/fonts/baloo-2-latin-800-normal.woff2',

@@ -187,3 +187,13 @@ th{color:var(--muted);font-weight:800}
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .powered .logo-dark{display:none}:root:not([data-theme="light"]) .powered .logo-light{display:block}}
 :root[data-theme="dark"] .powered .logo-dark{display:none}
 :root[data-theme="dark"] .powered .logo-light{display:block}
+
+/* Modul-Übersicht */
+.modtable td{vertical-align:middle}
+.modtable td.mod{white-space:normal;min-width:170px;font-weight:700}
+.modtable tr.gap td{background:color-mix(in srgb,var(--berry) 9%,transparent)}
+.school-btn{border:2px solid var(--line);background:var(--surface);border-radius:99px;padding:4px 10px;font-weight:800;font-size:.82rem;white-space:nowrap;min-width:92px}
+.school-btn.s-aktuell{border-color:var(--sky);background:color-mix(in srgb,var(--sky) 16%,var(--surface))}
+.school-btn.s-erledigt{border-color:var(--mint);background:color-mix(in srgb,var(--mint) 16%,var(--surface))}
+.school-tag{display:inline-block;margin-left:6px;border-radius:8px;padding:1px 8px;font-size:.75rem;font-weight:800;vertical-align:2px}
+.school-tag.now{background:var(--sky);color:#fff}
