@@ -177,3 +177,13 @@ th{color:var(--muted);font-weight:800}
 @media (prefers-reduced-motion: reduce){*{animation:none!important;transition:none!important}}
 .offline{background:var(--sun);color:#3A2A00;border-radius:12px;padding:6px 12px;font-weight:800;font-size:.85rem;text-align:center;margin-bottom:12px}
 .login{max-width:420px;margin:8vh auto 0}
+
+/* powered by Schwaiger */
+.powered{display:flex;justify-content:center;margin:36px 0 8px}
+.powered a{display:inline-flex;flex-direction:column;align-items:center;gap:4px;text-decoration:none;color:var(--muted);font-size:.75rem;font-weight:700;padding:8px 12px;border-radius:14px;opacity:.85}
+.powered a:hover,.powered a:focus-visible{opacity:1}
+.powered img{height:34px;width:auto;display:block}
+.powered .logo-light{display:none}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .powered .logo-dark{display:none}:root:not([data-theme="light"]) .powered .logo-light{display:block}}
+:root[data-theme="dark"] .powered .logo-dark{display:none}
+:root[data-theme="dark"] .powered .logo-light{display:block}

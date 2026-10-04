@@ -352,14 +352,15 @@ function render(){
 }
 function topBar(title,back){return `<div class="topbar"><button class="icon-btn" data-a="${back}" aria-label="Zurück">←</button><h2>${title}</h2><button class="icon-btn" data-a="mute" aria-label="Ton an/aus">${S.muted?'🔇':'🔊'}</button></div>`}
 
+const POWERED=`<footer class="powered"><a href="https://www.schwaiger-it.at" target="_blank" rel="noopener" aria-label="Schwaiger BUSINESS IT – Website öffnen"><span>powered by</span><img class="logo-dark" src="brand/schwaiger-logo.png" alt="Schwaiger BUSINESS IT" width="150" height="48"><img class="logo-light" src="brand/schwaiger-logo-light.png" alt="" width="150" height="48"></a></footer>`;
 function vBoot(){return `<div class="loading"><div class="spinner">🦊</div></div>`}
 function vLogin(){return `<div class="login"><div class="hero" style="text-align:center"><h1>Lern<span class="q">Quest</span></h1><p class="muted">Dieses Gerät einmalig anmelden</p></div>
   <div class="card stack"><div><label class="f" for="famPw">Familien-Passwort</label><input class="inp" id="famPw" type="password" autocomplete="current-password" autofocus></div>
-  <button class="btn block" data-a="login">Anmelden</button><p class="note">Danach bleibt das Gerät ein halbes Jahr angemeldet.</p></div></div>`}
+  <button class="btn block" data-a="login">Anmelden</button><p class="note">Danach bleibt das Gerät ein halbes Jahr angemeldet.</p></div>${POWERED}</div>`}
 function vHome(){
   return `<div class="hero"><h1>Lern<span class="q">Quest</span></h1><p class="muted">Wer lernt heute?</p></div>
   <div class="profiles">${['emma','hannah'].map(id=>{const d=S.data[id],l=levelOf(d.xp);return `<button class="profile ${id}" data-a="pickKid" data-id="${id}"><span class="blob"></span><span class="ava">${d.ava}</span><span><span class="name">${KIDS[id].name}</span><br><span class="meta">${KIDS[id].grade} · Level ${l} · 🔥 ${curStreak(d)}</span></span></button>`}).join('')}</div>
-  <div class="parent-link"><button class="btn ghost small" data-a="toPin">👤 Eltern-Bereich</button></div>`;
+  <div class="parent-link"><button class="btn ghost small" data-a="toPin">👤 Eltern-Bereich</button></div>${POWERED}`;
 }
 function curStreak(d){if(!d.lastDay)return 0;const g=daysBetween(d.lastDay,today());return g<=1?d.streak:0}
 function upcomingExams(d){return d.exams.filter(e=>daysBetween(today(),e.date)>=0).sort((a,b)=>a.date.localeCompare(b.date))}
@@ -468,7 +469,7 @@ function vParent(){
   <div class="card stack" style="margin-top:14px"><h3>Einstellungen</h3><div class="row"><input class="inp" id="newPin" inputmode="numeric" maxlength="4" placeholder="Neue 4-stellige PIN"><button class="btn small" data-a="setPin">Speichern</button></div>
    <p class="note">Der Fortschritt liegt am Server und ist auf allen angemeldeten Geräten gleich. Der Eltern-Modus sperrt sich nach einer Stunde automatisch.</p>
    <div class="row" style="flex-wrap:wrap"><button class="btn ghost small" data-a="lockParent">🔒 Eltern-Modus beenden</button><button class="btn ghost small" data-a="logout">Gerät abmelden</button></div>
-   <button class="btn ghost small" data-a="resetKid">Fortschritt von ${K.name} zurücksetzen</button></div>`;
+   <button class="btn ghost small" data-a="resetKid">Fortschritt von ${K.name} zurücksetzen</button></div>${POWERED}`;
 }
 
 /* ============ Quiz logic ============ */
