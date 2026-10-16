@@ -197,3 +197,16 @@ th{color:var(--muted);font-weight:800}
 .school-btn.s-erledigt{border-color:var(--mint);background:color-mix(in srgb,var(--mint) 16%,var(--surface))}
 .school-tag{display:inline-block;margin-left:6px;border-radius:8px;padding:1px 8px;font-size:.75rem;font-weight:800;vertical-align:2px}
 .school-tag.now{background:var(--sky);color:#fff}
+
+/* Schularbeitsstoff */
+.mat{margin-top:8px}
+.mat-files{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px}
+.mat-file{position:relative}
+.mat-file a{display:block;text-decoration:none;color:inherit;width:72px;height:72px;border-radius:12px;overflow:hidden;border:2px solid var(--line);background:var(--surface2)}
+.mat-file img{width:100%;height:100%;object-fit:cover;display:block}
+.mat-file .pdf{display:grid;place-items:center;height:100%;font-size:1.6rem;line-height:1}
+.mat-file .pdf small{font-size:.65rem;font-weight:800;color:var(--muted)}
+.mat-del{position:absolute;top:-6px;right:-6px;width:24px;height:24px;border-radius:50%;border:0;background:var(--berry);color:#fff;font-weight:800;line-height:1}
+.mat-sum{background:var(--surface2);border-radius:14px;padding:10px 12px;margin-bottom:8px;font-size:.92rem}
+.mat-sum .chip.small{padding:2px 9px;font-size:.8rem;margin-top:6px}
+.upl{display:inline-flex;align-items:center;cursor:pointer}

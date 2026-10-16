@@ -33,6 +33,7 @@ Aufgebaut wie **SIT-Time**: Frontend ohne Framework und ohne Build, Backend Node
 - `kids.json` – Fortschritt, Abzeichen, Statistik, Schularbeiten je Kind (mit Revisionsnummer gegen Überschreiben von zwei Geräten)
 - `settings.json` – PIN-Hash (scrypt) und Schulbücher
 - `ai-usage.json` – KI-Zähler pro Kind und Tag
+- `materials.json` + `uploads/` – hochgeladener Schularbeitsstoff (Fotos/PDFs) und die ausgelesene Stoff-Zusammenfassung
 
 ## App-Schnittstellen
 
@@ -41,7 +42,17 @@ Aufgebaut wie **SIT-Time**: Frontend ohne Framework und ohne Build, Backend Node
 - `GET /api/state`, `PUT /api/kids/:id`, `POST /api/kids/:id/reset` (Eltern)
 - `PUT /api/settings` (Eltern: Schulbücher, PIN)
 - `POST /api/ai/questions`
+- `POST /api/materials/:kid/:examId/files` (Foto/PDF hochladen), `POST …/analyze` (Stoff auslesen), `DELETE /api/materials/:kid/:examId` (Eltern)
+- `GET /api/files/:id`, `DELETE /api/files/:id` (Eltern)
 - `GET /healthz` – Status, Version, KI an/aus
+
+## Schularbeitsstoff hochladen
+
+- Pro Schularbeit bis zu 10 Dateien: Fotos (werden im Browser auf max. 1600 px verkleinert, JPEG) oder PDFs (max. 15 MB).
+- Nach dem Upload liest die KI den Stoff **einmal** aus und speichert eine Zusammenfassung (Themen, Merksätze, typische Aufgaben, Vokabeln). Jede Probe-Schularbeit nutzt dann nur diese Zusammenfassung – die Bilder werden nicht jedes Mal neu geschickt. Das hält die KI-Kosten klein.
+- Die Auswertung zählt als eine KI-Runde. Ohne API-Key werden die Dateien nur gespeichert.
+- Dateien werden am Server auf echte Bild-/PDF-Signaturen geprüft. Löschen können nur Eltern; mit der Schularbeit werden auch ihre Unterlagen gelöscht.
+- Hinweis Datenschutz: Für die Auswertung gehen die Unterlagen an die Anthropic API. Arbeitsblätter mit Namen oder Noten am besten abdecken oder zuschneiden.
 
 ## Konfiguration (App-Einstellungen in Azure)
 

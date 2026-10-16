@@ -5,6 +5,7 @@ const express = require('express');
 const session = require('./session');
 const store = require('./store');
 const ai = require('./ai');
+const materials = require('./materials');
 const { KIDS, SUBJ, DEFAULT_BOOKS } = require('./kids');
 const VERSION = require('../package.json').version;
 
@@ -22,7 +23,7 @@ app.use(session.middleware);
 
 app.use((req, res, next) => {
   res.set({
-    'Content-Security-Policy': "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; manifest-src 'self'; worker-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'",
+    'Content-Security-Policy': "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self'; manifest-src 'self'; worker-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'",
     'X-Content-Type-Options': 'nosniff',
     'Referrer-Policy': 'same-origin',
     'Permissions-Policy': 'camera=(), microphone=(), geolocation=()',
@@ -90,7 +91,8 @@ app.get('/api/state', needFamily, (req, res) => {
   const s = settings(), k = kidsDoc();
   const kids = {};
   for (const id of Object.keys(KIDS)) kids[id] = k[id] || { rev: 0, data: null };
-  res.json({ kids, settings: { books: s.books || DEFAULT_BOOKS, pinIsDefault: !!s.pinIsDefault }, ai: { enabled: ai.enabled(), limit: AI_DAILY_LIMIT, used: usage() } });
+  const mats = {}; for (const id of Object.keys(KIDS)) mats[id] = materials.list(id);
+  res.json({ kids, materials: mats, settings: { books: s.books || DEFAULT_BOOKS, pinIsDefault: !!s.pinIsDefault }, ai: { enabled: ai.enabled(), limit: AI_DAILY_LIMIT, used: usage() } });
 });
 
 app.put('/api/kids/:id', needFamily, (req, res) => {
@@ -123,6 +125,64 @@ app.put('/api/settings', needParent, (req, res) => {
   res.json({ ok: true, books: s.books, pinIsDefault: s.pinIsDefault });
 });
 
+/* ---------- Schularbeitsstoff (Uploads) ---------- */
+app.post('/api/materials/:kid/:examId/files', needFamily, express.raw({ type: Object.keys(materials.TYPES), limit: '16mb' }), async (req, res) => {
+  const { kid, examId } = req.params;
+  if (!KIDS[kid] || !materials.validExamId(examId)) return res.status(400).json({ error: 'bad_request' });
+  if (!Buffer.isBuffer(req.body) || !req.body.length) return res.status(400).json({ error: 'empty' });
+  const type = String(req.headers['content-type'] || '').split(';')[0].trim();
+  // Magic Bytes prüfen, damit nur echte Bilder/PDFs gespeichert werden
+  const b = req.body, sig = { 'image/jpeg': b[0] === 0xff && b[1] === 0xd8, 'image/png': b[0] === 0x89 && b[1] === 0x50, 'image/webp': b.subarray(8, 12).toString() === 'WEBP', 'application/pdf': b.subarray(0, 5).toString() === '%PDF-' };
+  if (!sig[type]) return res.status(415).json({ error: 'bad_type' });
+  try {
+    const name = decodeURIComponent(String(req.headers['x-filename'] || 'Datei'));
+    res.json(await materials.addFile(kid, examId, { type, name, data: req.body }));
+  } catch (e) {
+    res.status(e.code === 'too_large' ? 413 : e.code === 'too_many' ? 409 : e.code === 'bad_type' ? 415 : 500).json({ error: e.code || 'upload_failed' });
+  }
+});
+
+app.post('/api/materials/:kid/:examId/analyze', needFamily, async (req, res) => {
+  const { kid, examId } = req.params;
+  if (!KIDS[kid] || !materials.validExamId(examId)) return res.status(400).json({ error: 'bad_request' });
+  const mat = materials.get(kid, examId);
+  if (!mat || !mat.files.length) return res.status(404).json({ error: 'no_files' });
+  if (!ai.enabled()) return res.status(503).json({ error: 'ai_disabled' });
+  if ((usage()[kid] || 0) >= AI_DAILY_LIMIT) return res.status(429).json({ error: 'daily_limit' });
+  const subj = SUBJ[req.body?.subj] ? req.body.subj : 'mathe';
+  materials.setSummary(kid, examId, { status: 'analyzing' });
+  try {
+    const files = await materials.readFiles(kid, examId);
+    const summary = await ai.analyzeMaterial(files, { kid, subj, examNote: clip(req.body?.examNote, 300), book: clip(settings().books?.[kid]?.[subj], 150) });
+    countUse(kid);
+    res.json(materials.setSummary(kid, examId, { summary, status: 'done', analyzedAt: new Date().toISOString(), subj }));
+  } catch (e) {
+    console.error('[materials]', e.message);
+    materials.setSummary(kid, examId, { status: 'failed' });
+    res.status(e.status === 429 ? 429 : 502).json({ error: e.status === 429 ? 'rate_limited' : 'ai_failed' });
+  }
+});
+
+app.get('/api/files/:fileId', needFamily, (req, res) => {
+  if (!materials.validFileId(req.params.fileId)) return res.status(400).end();
+  const f = materials.findFile(req.params.fileId);
+  if (!f) return res.status(404).end();
+  res.set({ 'Content-Type': f.file.type, 'Cache-Control': 'private, max-age=86400', 'Content-Disposition': `inline; filename="${encodeURIComponent(f.file.name)}"` });
+  res.sendFile(materials.filePath(f.file.id));
+});
+
+app.delete('/api/files/:fileId', needParent, async (req, res) => {
+  if (!materials.validFileId(req.params.fileId)) return res.status(400).end();
+  res.json({ material: await materials.removeFile(req.params.fileId) });
+});
+
+app.delete('/api/materials/:kid/:examId', needParent, async (req, res) => {
+  const { kid, examId } = req.params;
+  if (!KIDS[kid] || !materials.validExamId(examId)) return res.status(400).json({ error: 'bad_request' });
+  await materials.removeExam(kid, examId);
+  res.json({ ok: true });
+});
+
 app.post('/api/kids/:id/reset', needParent, (req, res) => {
   const id = req.params.id;
   if (!KIDS[id]) return res.status(404).json({ error: 'unknown_kid' });
@@ -153,6 +213,7 @@ app.post('/api/ai/questions', needFamily, async (req, res) => {
     diff: ['leicht', 'mittel', 'schwer'].includes(b.diff) ? b.diff : 'mittel',
     n: exam ? 12 : 8,
     book: clip(s.books?.[b.kid]?.[b.subj], 150),
+    material: exam && materials.validExamId(b.examId) ? ai.summaryText(materials.get(b.kid, b.examId)?.summary) : '',
   };
   if (!params.exam && !params.topicTitle && !params.free) return res.status(400).json({ error: 'no_topic' });
   try {

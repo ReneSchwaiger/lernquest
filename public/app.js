@@ -279,7 +279,7 @@ function normKid(id,d){const base=defKid(id);d=Object.assign(base,d||{});if(type
 
 /* ============ State & Storage (eigener Server) ============ */
 const S={screen:'boot',kid:null,subj:null,quiz:null,parentKid:'emma',parent:false,pinIn:'',online:navigator.onLine,muted:lsGet('lq_muted',false),
-  ai:{enabled:false,limit:0,used:{}},rev:lsGet('lq_rev',{emma:0,hannah:0}),dirty:lsGet('lq_dirty',{}),
+  ai:{enabled:false,limit:0,used:{}},materials:lsGet('lq_mats',{emma:{},hannah:{}}),upload:null,rev:lsGet('lq_rev',{emma:0,hannah:0}),dirty:lsGet('lq_dirty',{}),
   data:{emma:normKid('emma',lsGet('lq_kid_emma')),hannah:normKid('hannah',lsGet('lq_kid_hannah'))},settings:Object.assign({books:{},pinIsDefault:false},lsGet('lq_settings',{}))};
 async function api(method,url,body,signal){
   const r=await fetch(url,{method,headers:body?{'content-type':'application/json'}:{},body:body?JSON.stringify(body):undefined,credentials:'same-origin',signal});
@@ -312,6 +312,7 @@ async function syncState(){
   try{
     const st=await api('GET','/api/state');setOnline(true);
     S.settings={books:st.settings.books||{},pinIsDefault:!!st.settings.pinIsDefault};lsSet('lq_settings',S.settings);
+    if(st.materials){S.materials=st.materials;lsSet('lq_mats',S.materials)}
     S.ai=st.ai||S.ai;
     for(const id of Object.keys(KIDS)){
       const cur=st.kids[id]||{rev:0,data:null};
@@ -372,11 +373,11 @@ function vKid(){
   <div class="card"><div class="kidhead"><div class="ava">${d.ava}</div><div style="flex:1;min-width:0"><div class="spread"><span class="lvl">Level ${l} · ${titleOf(l)}</span><span class="muted" style="font-weight:700;font-size:.9rem">${d.xp-lo}/${hi-lo} XP</span></div><div class="xpbar"><i style="width:${Math.min(100,(d.xp-lo)/(hi-lo)*100)}%"></i></div></div></div>
   <div class="chips"><span class="chip">🔥 ${curStreak(d)} Tage</span><span class="chip">🪙 ${d.coins}</span><span class="chip">🏅 ${d.badges.length}/${BADGES.length}</span><span class="chip">✅ ${d.totalCorrect}</span></div></div>
   <div class="card" style="margin-top:14px"><div class="goal"><div class="ring" style="--p:${Math.min(100,dx/DAILY_GOAL*100)}"><span>${Math.min(dx,DAILY_GOAL)}</span></div><div><h3>Tagesziel: ${DAILY_GOAL} XP</h3><div class="muted">${dx>=DAILY_GOAL?'Geschafft! Du bist spitze. 🎉':`Noch ${DAILY_GOAL-dx} XP – das ist ungefähr eine Übung.`}</div></div></div></div>
-  ${ex.length?`<div class="card stack" style="margin-top:14px"><h3>Nächste Schularbeiten</h3>${ex.slice(0,3).map(e=>{const n=daysBetween(today(),e.date);return `<div class="exam"><div class="days">${n}<small>${n===1?'Tag':'Tage'}</small></div><div style="flex:1;min-width:0"><b>${SUBJ[e.subj].e} ${SUBJ[e.subj].t}</b><div class="muted" style="font-size:.9rem">${esc(examTopicsText(e))}</div></div><button class="btn small" data-a="startExam" data-id="${e.id}">Trainieren</button></div>`}).join('')}</div>`:''}
+  ${ex.length?`<div class="card stack" style="margin-top:14px"><h3>Nächste Schularbeiten</h3>${ex.slice(0,3).map(e=>{const n=daysBetween(today(),e.date);return `<div class="exam"><div class="days">${n}<small>${n===1?'Tag':'Tage'}</small></div><div style="flex:1;min-width:0"><b>${SUBJ[e.subj].e} ${SUBJ[e.subj].t}</b><div class="muted" style="font-size:.9rem">${esc(examTopicsText(e))}${(matOf(S.kid,e.id)||{files:[]}).files.length?` · 📎 ${matOf(S.kid,e.id).files.length} Unterlagen`:''}</div></div><button class="btn small" data-a="startExam" data-id="${e.id}">Trainieren</button></div>`}).join('')}</div>`:''}
   <div class="subjects">${Object.keys(SUBJ).map(s=>{const acc=subjAcc(d,s);return `<button class="subject ${s}" data-a="pickSubj" data-s="${s}"><span class="emo">${SUBJ[s].e}</span><h3>${SUBJ[s].t}</h3><span class="lvltag">Niveau: ${K.levels[s]}${bookOf(S.kid,s)?'<br>📚 '+esc(bookOf(S.kid,s)):''}</span><div class="mini"><i style="width:${acc==null?0:Math.round(acc*100)}%"></i></div><span class="muted" style="font-size:.85rem;font-weight:700">${acc==null?'Noch nicht geübt':Math.round(acc*100)+' % richtig'}</span></button>`}).join('')}</div>
   <div class="navrow"><button class="btn sun" data-a="examNew">📝 Schularbeit</button><button class="btn ghost" data-a="go" data-to="badges">🏅 Abzeichen</button><button class="btn ghost" data-a="go" data-to="shop">🛍️ Shop</button></div>`;
 }
-function examTopicsText(e){const ts=(e.topics||[]).map(k=>findTopic(e.kid||S.kid,e.subj,k)?.t).filter(Boolean);return [ts.join(', '),e.note].filter(Boolean).join(' – ')||'Alle Themen'}
+function examTopicsText(e){const ts=(e.topics||[]).map(k=>findTopic(e.kid||S.kid,e.subj,k)?.t).filter(Boolean);const m=matOf(e.kid||S.kid,e.id);const mt=m&&m.summary&&m.summary.title;return [ts.join(', '),mt&&('📚 '+mt),e.note].filter(Boolean).join(' – ')||'Alle Themen'}
 function stars(st){if(!st||st.t<3)return '☆☆☆';const r=st.c/st.t;return r>=.9?'⭐⭐⭐':r>=.75?'⭐⭐☆':r>=.5?'⭐☆☆':'☆☆☆'}
 function vSubject(){
   const d=S.data[S.kid],list=TOPICS[S.kid][S.subj];
@@ -423,6 +424,57 @@ function vResult(){
 function vBadges(){const d=S.data[S.kid];return `${topBar('Abzeichen','kid')}<div class="badges">${BADGES.map(b=>`<div class="badge ${d.badges.includes(b.k)?'':'locked'}"><div class="e">${b.e}</div><b>${b.t}</b><small>${b.d}</small></div>`).join('')}</div>`}
 function vShop(){const d=S.data[S.kid];return `${topBar('Avatar-Shop','kid')}<div class="card" style="margin-bottom:14px"><div class="spread"><b>Deine Münzen</b><span class="chip">🪙 ${d.coins}</span></div><p class="muted" style="margin:6px 0 0">Für jede richtige Antwort gibt's eine Münze, für Combos und perfekte Runden extra.</p></div>
   <div class="shop">${AVATARS.map(([e,p])=>{const own=d.owned.includes(e);return `<button class="shopitem ${d.ava===e?'cur':''}" data-a="buy" data-e="${e}" data-p="${p}"><span class="e">${e}</span><b style="font-size:.85rem">${d.ava===e?'Aktiv':own?'Wählen':'🪙 '+p}</b></button>`}).join('')}</div>`}
+/* ---------- Schularbeitsstoff ---------- */
+const matOf=(kid,examId)=>examId&&S.materials[kid]?S.materials[kid][examId]||null:null;
+function materialBlock(kid,exam,{parent=false,draft=false}={}){
+  const m=draft?null:matOf(kid,exam.id);const files=m?m.files:[];const up=S.upload&&S.upload.kid===kid&&S.upload.examId===(exam.id||'new');
+  const sum=m&&m.summary;
+  const status=up?`<p class="note">⏳ ${esc(S.upload.msg)}</p>`
+    :m&&m.status==='analyzing'?'<p class="note">⏳ Stoff wird ausgewertet …</p>'
+    :m&&m.status==='failed'?`<p class="note" style="color:var(--berry)">Auswertung hat nicht geklappt. <button class="btn ghost small" data-a="reanalyze" data-kid="${kid}" data-id="${exam.id}" data-s="${exam.subj}">Nochmal versuchen</button></p>`
+    :m&&m.status==='pending'&&files.length?(S.ai.enabled?`<p class="note">Neue Dateien noch nicht ausgewertet. <button class="btn ghost small" data-a="reanalyze" data-kid="${kid}" data-id="${exam.id}" data-s="${exam.subj}">Jetzt auswerten</button></p>`:'<p class="note">KI ist nicht eingerichtet – die Unterlagen sind gespeichert, werden aber nicht ausgewertet.</p>'):'';
+  return `<div class="mat">
+   ${files.length?`<div class="mat-files">${files.map(f=>`<div class="mat-file"><a href="/api/files/${f.id}" target="_blank" rel="noopener" title="${esc(f.name)}">${f.type==='application/pdf'?'<span class="pdf">📄<small>PDF</small></span>':`<img src="/api/files/${f.id}" alt="${esc(f.name)}" loading="lazy">`}</a>${parent?`<button class="mat-del" data-a="delFile" data-id="${f.id}" aria-label="Datei löschen">×</button>`:''}</div>`).join('')}</div>`:''}
+   ${sum?`<div class="mat-sum"><b>📚 Stoff laut Unterlagen${sum.title?': '+esc(sum.title):''}</b>${sum.topics&&sum.topics.length?`<div>${sum.topics.map(t=>`<span class="chip small">${esc(t)}</span>`).join(' ')}</div>`:''}${sum.pages?`<div class="note">Seiten/Kapitel: ${esc(sum.pages)}</div>`:''}${sum.unreadable?`<div class="note">Nicht lesbar: ${esc(sum.unreadable)}</div>`:''}</div>`:''}
+   ${status}
+   ${up?'':`<label class="btn ghost small upl">📎 ${files.length?'Weitere Unterlagen':'Stoff hochladen'} (Foto/PDF)<input type="file" multiple accept="image/*,application/pdf" data-up-kid="${kid}" data-up-exam="${draft?'new':exam.id}" data-up-subj="${exam.subj}" hidden></label>`}
+  </div>`;
+}
+async function shrinkImage(file){
+  let src;try{src=await createImageBitmap(file)}catch(e){src=await new Promise((res,rej)=>{const i=new Image();i.onload=()=>res(i);i.onerror=rej;i.src=URL.createObjectURL(file)})}
+  const w=src.width||src.naturalWidth,h=src.height||src.naturalHeight,sc=Math.min(1,1600/Math.max(w,h));
+  const c=document.createElement('canvas');c.width=Math.round(w*sc);c.height=Math.round(h*sc);c.getContext('2d').drawImage(src,0,0,c.width,c.height);
+  return await new Promise(r=>c.toBlob(r,'image/jpeg',.85));
+}
+async function uploadMaterial(kid,examId,subj,fileList){
+  const files=[...fileList].slice(0,10);if(!files.length)return;
+  if(!S.online){toast('Zum Hochladen braucht es Internet.');return}
+  S.upload={kid,examId,msg:'Lade hoch …'};render();
+  let last=null,ok=0;
+  try{
+    for(let i=0;i<files.length;i++){
+      const f=files[i];S.upload.msg=`Lade hoch … ${i+1}/${files.length}`;render();
+      const isPdf=f.type==='application/pdf'||/\.pdf$/i.test(f.name);
+      if(!isPdf&&!/^image\//.test(f.type)){toast(`„${f.name}“ ist kein Foto oder PDF.`);continue}
+      if(isPdf&&f.size>15*1024*1024){toast(`„${f.name}“ ist zu groß (max. 15 MB).`);continue}
+      const blob=isPdf?f:await shrinkImage(f);
+      const r=await fetch(`/api/materials/${kid}/${examId}/files`,{method:'POST',headers:{'content-type':isPdf?'application/pdf':'image/jpeg','x-filename':encodeURIComponent(f.name)},body:blob,credentials:'same-origin'});
+      const j=await r.json().catch(()=>null);
+      if(!r.ok){toast(j&&j.error==='too_many'?'Maximal 10 Dateien pro Schularbeit.':j&&j.error==='too_large'?`„${f.name}“ ist zu groß.`:`„${f.name}“ konnte nicht hochgeladen werden.`);if(j&&j.error==='too_many')break;continue}
+      last=j;ok++;
+    }
+    if(last){S.materials[kid]=S.materials[kid]||{};S.materials[kid][examId]=last;lsSet('lq_mats',S.materials)}
+    if(ok&&S.ai.enabled)await analyzeMaterial(kid,examId,subj);
+    else if(ok)toast(`${ok} Datei(en) gespeichert.`);
+  }finally{S.upload=null;if(!isTyping())render()}
+}
+async function analyzeMaterial(kid,examId,subj){
+  S.upload={kid,examId,msg:'Claude liest die Unterlagen … (bis zu 1 Minute)'};render();
+  const ex=S.data[kid].exams.find(x=>x.id===examId);
+  try{const r=await api('POST',`/api/materials/${kid}/${examId}/analyze`,{subj,examNote:ex&&ex.note||''});S.materials[kid][examId]=r;lsSet('lq_mats',S.materials);toast('Stoff ausgewertet ✓')}
+  catch(e){const c=e.data&&e.data.error;toast(c==='daily_limit'?'KI-Tageslimit erreicht – Auswertung morgen nochmal starten.':'Auswertung hat nicht geklappt.');const m=matOf(kid,examId);if(m)m.status='failed'}
+  finally{S.upload=null}
+}
 function vExamSetup(){
   const E=S.examDraft;const list=TOPICS[S.kid][E.subj];
   return `${topBar('📝 Schularbeit','kid')}
@@ -430,6 +482,7 @@ function vExamSetup(){
   <div><label class="f">Welche Themen kommen?</label><div class="checks">${list.map(t=>`<label><input type="checkbox" data-a="exTopic" value="${t.k}" ${E.topics.includes(t.k)?'checked':''}> ${t.t}${t.profi?' 🚀':''}</label>`).join('')}</div></div>
   <div><label class="f" for="exNote">Was hat die Lehrerin noch gesagt? (optional)</label><input class="inp" id="exNote" value="${esc(E.note||'')}" placeholder="z.B. Textaufgaben mit Prozent, Seite 40–52"></div>
   <div><label class="f" for="exDate">Datum (optional – für den Countdown)</label><input class="inp" type="date" id="exDate" value="${E.date||''}"></div>
+  <div><label class="f">Unterlagen (Fotos vom Buch, Arbeitsblatt, Stoffzettel)</label>${materialBlock(S.kid,E,{draft:!E.id})}${!E.id?'<p class="note">Zum Hochladen wird die Schularbeit mit Datum gespeichert.</p>':''}</div>
   <button class="btn sun block" data-a="examGo">Probe-Schularbeit starten</button>
   ${S.ai.enabled&&S.online&&aiLeft(S.kid)>0?'<p class="note">Mit KI: Claude erstellt eine Probe-Schularbeit mit 12 Aufgaben von leicht bis schwer.</p>':'<p class="note">12 Aufgaben aus den gewählten Themen.</p>'}
   </div>`;
@@ -478,7 +531,7 @@ function vParent(){
   <div class="card stack" style="margin-top:14px"><h3>Hier braucht ${K.name} Übung</h3>${weak.length?weak.slice(0,6).map(r=>`<div class="bar" style="grid-template-columns:1fr 70px 48px"><span>${SUBJ[r.s].e} ${esc(r.t)}</span><span class="muted" style="font-size:.85rem">${r.n} Aufg.</span><span style="color:var(--berry)">${Math.round(r.r*100)} %</span></div>`).join(''):'<p class="muted">Noch keine Schwachstellen erkennbar (ab 5 Aufgaben pro Thema mit unter 70 %).</p>'}
   ${strong.length?`<h3>Das sitzt</h3>${strong.slice(0,5).map(r=>`<div class="muted">✅ ${SUBJ[r.s].e} ${esc(r.t)} – ${Math.round(r.r*100)} %</div>`).join('')}`:''}</div>
   <div class="card stack" style="margin-top:14px"><h3>Schularbeiten</h3>
-   ${d.exams.length?d.exams.slice().sort((a,b)=>a.date.localeCompare(b.date)).map(e=>{const n=daysBetween(today(),e.date);return `<div class="exam"><div class="days">${n<0?'✓':n}<small>${n<0?'vorbei':n===1?'Tag':'Tage'}</small></div><div style="flex:1;min-width:0"><b>${SUBJ[e.subj].t} · ${new Date(e.date+'T00:00').toLocaleDateString('de-AT')}</b><div class="muted" style="font-size:.9rem">${esc(examTopicsText({...e,kid:id}))}${e.best!=null?` · Bestes Training: Note ${e.best}`:''}</div></div><button class="icon-btn" data-a="delExam" data-id="${e.id}" aria-label="Löschen">🗑️</button></div>`}).join(''):'<p class="muted">Noch keine Schularbeit eingetragen.</p>'}
+   ${d.exams.length?d.exams.slice().sort((a,b)=>a.date.localeCompare(b.date)).map(e=>{const n=daysBetween(today(),e.date);return `<div class="exam"><div class="days">${n<0?'✓':n}<small>${n<0?'vorbei':n===1?'Tag':'Tage'}</small></div><div style="flex:1;min-width:0"><b>${SUBJ[e.subj].t} · ${new Date(e.date+'T00:00').toLocaleDateString('de-AT')}</b><div class="muted" style="font-size:.9rem">${esc(examTopicsText({...e,kid:id}))}${e.best!=null?` · Bestes Training: Note ${e.best}`:''}</div></div><button class="icon-btn" data-a="delExam" data-id="${e.id}" aria-label="Löschen">🗑️</button></div>${n>=0||matOf(id,e.id)?materialBlock(id,e,{parent:true}):''}`}).join(''):'<p class="muted">Noch keine Schularbeit eingetragen.</p>'}
    <details><summary style="font-weight:800;cursor:pointer">+ Schularbeit eintragen</summary><div class="stack" style="margin-top:12px">
     <select class="inp" id="pSubj">${Object.keys(SUBJ).map(s=>`<option value="${s}">${SUBJ[s].t}</option>`).join('')}</select>
     <input class="inp" type="date" id="pDate" value="">
@@ -538,7 +591,7 @@ async function runAI(opts,label,keys,examId){
   S.aiMsg=pick(['Claude bastelt deine Aufgaben …','Aufgaben werden gezaubert …','Gleich geht\'s los …']);go('aiLoading');
   aiAbort=new AbortController();
   try{
-    const res=await api('POST','/api/ai/questions',{kid:opts.kid,subj:opts.subj,topicTitle:opts.topicTitle||'',free:opts.free||'',diff:opts.diff||'mittel',exam:!!opts.exam,examNote:opts.examNote||''},aiAbort.signal);
+    const res=await api('POST','/api/ai/questions',{kid:opts.kid,subj:opts.subj,topicTitle:opts.topicTitle||'',free:opts.free||'',diff:opts.diff||'mittel',exam:!!opts.exam,examNote:opts.examNote||'',examId:opts.examId||''},aiAbort.signal);
     S.ai.used=Object.assign({},S.ai.used,{[opts.kid]:res.used});
     const items=cleanAI(res.questions);
     if(items.length<3)throw {status:502};
@@ -587,7 +640,8 @@ document.addEventListener('click',async ev=>{
    case 'startExam':{const e=S.data[S.kid].exams.find(x=>x.id===el.dataset.id);if(!e)break;S.examDraft={subj:e.subj,topics:[...(e.topics||[])],note:e.note||'',date:e.date,id:e.id};go('examSetup');break}
    case 'exSubj':S.examDraft.subj=el.dataset.s;S.examDraft.topics=[];syncDraft();render();break;
    case 'examGo':{syncDraft();const E=S.examDraft,d=S.data[S.kid];
-     if(!E.topics.length&&!E.note){toast('Kreuz mindestens ein Thema an.');break}
+     const hasMat=!!(E.id&&matOf(S.kid,E.id)&&matOf(S.kid,E.id).summary);
+     if(!E.topics.length&&!E.note&&!hasMat){toast('Kreuz mindestens ein Thema an oder lade Unterlagen hoch.');break}
      let id=E.id;if(E.date){if(id){const ex=d.exams.find(x=>x.id===id);if(ex)Object.assign(ex,{subj:E.subj,topics:E.topics,note:E.note,date:E.date})}else{id=uid();d.exams.push({id,subj:E.subj,topics:E.topics,note:E.note,date:E.date});E.id=id}saveKid(S.kid)}
      startExamRun({...E},id);break}
    case 'toPin':S.pinIn='';S.kid=null;if(S.parent){api('GET','/api/me').then(m=>{S.parent=!!m.parent;go(S.parent?'parent':'pin')}).catch(()=>go('pin'))}else go('pin');break;
@@ -597,17 +651,23 @@ document.addEventListener('click',async ev=>{
    case 'logout':{if(!(await ask('Dieses Gerät abmelden?',{ok:'Abmelden'})))break;await api('POST','/api/logout').catch(()=>{});S.parent=false;go('login');break}
    case 'lockParent':{await api('POST','/api/parent/lock').catch(()=>{});S.parent=false;go('home');break}
    case 'pKid':S.parentKid=el.dataset.id;render();break;
+   case 'delFile':{if(!(await ask('Diese Datei löschen?',{ok:'Löschen'})))break;try{const r=await api('DELETE','/api/files/'+el.dataset.id);for(const kid of Object.keys(S.materials))for(const [eid,m] of Object.entries(S.materials[kid]))if(m.files.some(f=>f.id===el.dataset.id)){if(r.material)S.materials[kid][eid]=r.material;else delete S.materials[kid][eid]}lsSet('lq_mats',S.materials);render()}catch(e){parentErr(e)}break}
+   case 'reanalyze':await analyzeMaterial(el.dataset.kid,el.dataset.id,el.dataset.s);render();break;
    case 'pSubj':S.pSubj=el.dataset.s;render();break;
    case 'parent':go('parent');break;
    case 'school':{const d=S.data[S.parentKid];d.school=d.school||{};const k=el.dataset.k;const order=SCHOOL_STATES.map(x=>x[0]);const nx=order[(order.indexOf(d.school[k]||'')+1)%order.length];if(nx)d.school[k]=nx;else delete d.school[k];saveKid(S.parentKid);render();break}
    case 'addExam':{const subj=document.getElementById('pSubj').value,date=document.getElementById('pDate').value,note=document.getElementById('pNote').value.trim();if(!date){toast('Bitte ein Datum wählen.');break}S.data[S.parentKid].exams.push({id:uid(),subj,date,note,topics:[]});saveKid(S.parentKid);toast('Schularbeit eingetragen');render();break}
-   case 'delExam':{if(!(await ask('Diese Schularbeit entfernen?',{ok:'Entfernen'})))break;const d=S.data[S.parentKid];d.exams=d.exams.filter(x=>x.id!==el.dataset.id);saveKid(S.parentKid);render();break}
+   case 'delExam':{if(!(await ask('Diese Schularbeit entfernen?',{ok:'Entfernen'})))break;const d=S.data[S.parentKid];d.exams=d.exams.filter(x=>x.id!==el.dataset.id);saveKid(S.parentKid);if(matOf(S.parentKid,el.dataset.id)){api('DELETE',`/api/materials/${S.parentKid}/${el.dataset.id}`).catch(()=>{});delete S.materials[S.parentKid][el.dataset.id]}render();break}
    case 'saveBooks':{const b={};b[S.parentKid]={};for(const sb of Object.keys(SUBJ))b[S.parentKid][sb]=document.getElementById('bk_'+sb).value.trim();try{const r=await api('PUT','/api/settings',{books:b});S.settings.books=r.books;lsSet('lq_settings',S.settings);toast('Bücher gespeichert');render()}catch(e){parentErr(e)}break}
    case 'setPin':{const v=document.getElementById('newPin').value.trim();if(!/^\d{4}$/.test(v)){toast('Die PIN braucht genau 4 Ziffern.');break}try{await api('PUT','/api/settings',{pin:v});S.settings.pinIsDefault=false;lsSet('lq_settings',S.settings);toast('PIN gespeichert');render()}catch(e){parentErr(e)}break}
    case 'resetKid':{const n=KIDS[S.parentKid].name;if((await ask(`Zum Zurücksetzen „${n}“ eintippen:`,{input:true,ok:'Zurücksetzen'}))===n){try{const r=await api('POST','/api/kids/'+S.parentKid+'/reset');S.rev[S.parentKid]=r.rev;S.data[S.parentKid]=defKid(S.parentKid);lsSet('lq_kid_'+S.parentKid,S.data[S.parentKid]);delete S.dirty[S.parentKid];persistLocal();toast('Zurückgesetzt');render()}catch(e){parentErr(e)}}break}
   }
 });
-document.addEventListener('change',ev=>{const el=ev.target;if(el.dataset.a==='exTopic'){const E=S.examDraft;if(el.checked)E.topics.push(el.value);else E.topics=E.topics.filter(x=>x!==el.value)}});
+document.addEventListener('change',async ev=>{const el=ev.target;
+  if(el.dataset.upKid){const files=el.files;let kid=el.dataset.upKid,examId=el.dataset.upExam,subj=el.dataset.upSubj;
+    if(examId==='new'){syncDraft();const E=S.examDraft;if(!E.date){toast('Bitte zuerst das Datum der Schularbeit eintragen.');el.value='';return}
+      examId=uid();E.id=examId;S.data[kid].exams.push({id:examId,subj:E.subj,topics:E.topics,note:E.note,date:E.date});saveKid(kid);subj=E.subj}
+    await uploadMaterial(kid,examId,subj,files);el.value='';return}if(el.dataset.a==='exTopic'){const E=S.examDraft;if(el.checked)E.topics.push(el.value);else E.topics=E.topics.filter(x=>x!==el.value)}});
 document.addEventListener('input',ev=>{if(ev.target.id==='ans'&&S.quiz)S.quiz.typed=ev.target.value});
 document.addEventListener('keydown',ev=>{if(ev.key==='Enter'&&S.screen==='login'){ev.preventDefault();document.querySelector('[data-a="login"]')?.click();return}if(ev.key==='Enter'&&S.screen==='quiz'&&!document.querySelector('.modal-bg')){ev.preventDefault();const Q=S.quiz;if(Q.answered)document.querySelector('[data-a="next"]')?.click();else if(Q.items[Q.i].type==='input')answer(document.getElementById('ans').value)}});
 function parentErr(e){if(e.status===403){S.parent=false;toast('Eltern-Modus abgelaufen – bitte PIN neu eingeben.');go('pin')}else toast(e.status?'Speichern fehlgeschlagen.':'Keine Verbindung zum Server.')}
@@ -616,10 +676,10 @@ async function startExamRun(E,examId){
   const list=TOPICS[S.kid][E.subj];const chosen=E.topics.map(k=>list.find(t=>t.k===k)).filter(Boolean);
   const label='Probe-Schularbeit '+SUBJ[E.subj].t;const keys=chosen.length?chosen.map(t=>t.k):['exam'];
   const spec={type:'exam',draft:E,examId};
-  if(S.ai.enabled&&S.online&&aiLeft(S.kid)>0){const ok=await runAI({kid:S.kid,subj:E.subj,topicTitle:chosen.map(t=>t.t).join(', '),exam:true,examNote:E.note,n:12},label,keys,examId||'tmp');
+  if(S.ai.enabled&&S.online&&aiLeft(S.kid)>0){const ok=await runAI({kid:S.kid,subj:E.subj,topicTitle:chosen.map(t=>t.t).join(', '),exam:true,examNote:E.note,examId:examId||'',n:12},label,keys,examId||'tmp');
     if(ok){S.quiz.examId=examId||'tmp';S.quiz.spec=spec;S.quiz.items.forEach((q,i)=>q._key='exam');return}
     if(!chosen.length)return;}
-  if(!chosen.length){toast('Ohne KI bitte Themen ankreuzen.');go('examSetup');return}
+  if(!chosen.length){toast('Ohne KI bitte Themen ankreuzen – Unterlagen kann nur die KI auswerten.');go('examSetup');return}
   const gens=chosen.map(t=>()=>{const q=t.g();q._key=t.k;return q});
   startQuiz({items:buildItems(gens,12),label,subj:E.subj,keys,examId:examId||'tmp'});S.quiz.spec=spec;
 }
