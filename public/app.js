@@ -403,7 +403,7 @@ function vQuiz(){
   else{const im=q.check==='num'?'decimal':'text';body=`<input class="ans" id="ans" inputmode="${im}" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Deine Antwort" value="${esc(Q.typed||'')}" ${answered?'disabled':''} autofocus>
    ${q.check==='frac'&&!answered?'<div class="keys"><button class="btn ghost small" data-a="key" data-v="/">/</button><button class="btn ghost small" data-a="key" data-v="-">−</button></div>':''}
    ${!answered?'<button class="btn block" style="margin-top:14px" data-a="submit">Prüfen</button>':''}`}
-  const fb=answered?`<div class="feedback ${Q.lastOk?'ok':'bad'}"><h3>${Q.lastOk?pick(['Richtig! 🎉','Super! ✨','Genau so! 💪','Stark! 🔥']):'Nicht ganz 🤔'}</h3>${!Q.lastOk?`<div>Richtige Antwort: <b>${esc(dispAns(q))}</b></div>`:''}${q.expl?`<div class="muted" style="margin-top:4px">${esc(q.expl)}</div>`:''}<button class="btn ${Q.lastOk?'mint':''} block" style="margin-top:12px" data-a="next" autofocus>${Q.i+1<Q.items.length?'Weiter':'Ergebnis ansehen'}</button></div>`:'';
+  const fb=answered?`<div class="feedback ${Q.lastOk?'ok':'bad'}"><h3>${Q.lastOk?Q.praise:'Nicht ganz 🤔'}</h3>${!Q.lastOk&&Q.examId?`<div>Deine Antwort: <s>${esc(q._given)}</s></div>`:''}${!Q.lastOk?`<div>Richtige Antwort: <b>${esc(dispAns(q))}</b></div>`:''}${!Q.lastOk&&Q.examId?explainBox(q):q.expl?`<div class="muted" style="margin-top:4px">${esc(q.expl)}</div>`:''}<button class="btn ${Q.lastOk?'mint':''} block" style="margin-top:12px" data-a="next" autofocus>${Q.i+1<Q.items.length?'Weiter':'Ergebnis ansehen'}</button></div>`:'';
   return `<div class="qtop"><button class="icon-btn" data-a="quitQuiz" aria-label="Beenden">✕</button><div class="prog"><i style="width:${pct}%"></i></div><span class="combo ${Q.combo>=3?'hot':''}">${Q.combo>=2?'🔥'+Q.combo:''}</span></div>
   <p class="muted" style="margin:0 0 8px;font-weight:700">${esc(Q.label)} · Aufgabe ${Q.i+1}/${Q.items.length}${Q.isAI?' · ✨ KI':''}</p>
   <div class="card qcard"><div class="qtext">${esc(q.q)}</div>${body}</div>${fb}`;
@@ -418,7 +418,7 @@ function vResult(){
   ${R.levelUp?`<p style="font-weight:800;color:var(--accent);font-size:1.2rem">⬆️ Level ${R.levelUp} erreicht!</p>`:''}
   ${R.newBadges.length?`<div style="margin-top:14px"><h3>Neue Abzeichen</h3><div class="badges" style="margin-top:10px">${R.newBadges.map(b=>`<div class="badge"><div class="e">${b.e}</div><b>${b.t}</b><small>${b.d}</small></div>`).join('')}</div></div>`:''}
   </div>
-  ${R.wrong.length?`<div class="card stack" style="margin-top:14px"><h3>Das schauen wir uns nochmal an</h3>${R.wrong.map(w=>`<div><b>${esc(w.q)}</b><div class="muted">Richtig: ${esc(dispAns(w))}${w.expl?' – '+esc(w.expl):''}</div></div>`).join('')}</div>`:''}
+  ${R.wrong.length?`<div class="card stack" style="margin-top:14px"><h3>Das schauen wir uns nochmal an</h3>${R.wrong.map(w=>R.grade?`<div class="wrongitem"><b>${esc(w.q)}</b><div>Deine Antwort: <s>${esc(w._given)}</s> · Richtig: <b>${esc(dispAns(w))}</b></div>${explainBox(w)}</div>`:`<div><b>${esc(w.q)}</b><div class="muted">Richtig: ${esc(dispAns(w))}${w.expl?' – '+esc(w.expl):''}</div></div>`).join('')}</div>`:''}
   <div class="row" style="margin-top:16px"><button class="btn block" data-a="again">Nochmal</button><button class="btn ghost block" data-a="go" data-to="kid">Fertig</button></div>`;
 }
 function vBadges(){const d=S.data[S.kid];return `${topBar('Abzeichen','kid')}<div class="badges">${BADGES.map(b=>`<div class="badge ${d.badges.includes(b.k)?'':'locked'}"><div class="e">${b.e}</div><b>${b.t}</b><small>${b.d}</small></div>`).join('')}</div>`}
@@ -549,10 +549,27 @@ function vParent(){
 
 /* ============ Quiz logic ============ */
 function buildItems(gens,n){const out=[],seen=new Set();let g=0;while(out.length<n&&g++<n*8){const gen=gens[out.length%gens.length]||pick(gens);let q;try{q=gen()}catch(e){continue}if(!q||seen.has(q.q))continue;seen.add(q.q);out.push(q)}return shuffle(out)}
+/* ---------- Fehler-Erklärung (Probe-Schularbeit) ---------- */
+function explainBox(q){
+  const x=q._explain;
+  if(!x||x.failed)return q.expl?`<div class="explain"><b>💡 So geht's:</b> ${esc(q.expl)}</div>`:'';
+  if(x.loading)return `<div class="explain loading"><span class="spinner small">🧠</span> Claude schaut sich deinen Fehler an …</div>`;
+  return `<div class="explain"><b>💡 Warum das nicht stimmt</b><p>${esc(x.why)}</p>${x.steps&&x.steps.length?`<ol>${x.steps.map(st=>`<li>${esc(st)}</li>`).join('')}</ol>`:''}${x.tip?`<p class="tip">⭐ ${esc(x.tip)}</p>`:''}</div>`;
+}
+async function fetchExplain(q){
+  const kid=S.kid,lim=S.ai.explainLimit||0,used=(S.ai.used||{})[kid+':x']||0;
+  if(!S.ai.enabled||!S.online||used>=lim)return;
+  q._explain={loading:true};
+  try{
+    const r=await api('POST','/api/ai/explain',{kid,subj:S.quiz?S.quiz.subj:'mathe',question:q.q,options:q.type==='mc'?q.options:[],correct:dispAns(q),given:q._given,expl:q.expl||''});
+    q._explain=r;S.ai.used=Object.assign({},S.ai.used,{[kid+':x']:used+1});
+  }catch(e){q._explain={failed:true}}
+  if((S.screen==='quiz'||S.screen==='result')&&!document.querySelector('.modal-bg'))render();
+}
 function startQuiz({items,label,subj,keys,isAI,examId,profi}){S.quiz={items,label,subj,keys,isAI,examId,profi,i:0,answered:false,correct:0,combo:0,bestCombo:0,wrong:[],perKey:{}};go('quiz')}
 function answer(val){const Q=S.quiz,q=Q.items[Q.i];if(Q.answered)return;if(q.type==='input'&&!String(val).trim()){toast('Schreib zuerst eine Antwort hinein.');return}
-  const ok=checkAnswer(q,val);Q.answered=true;Q.lastOk=ok;Q.picked=val;Q.typed=val;const key=q._key||Q.keys[0];Q.perKey[key]=Q.perKey[key]||{c:0,t:0};Q.perKey[key].t++;
-  if(ok){Q.correct++;Q.combo++;Q.bestCombo=Math.max(Q.bestCombo,Q.combo);Q.perKey[key].c++;beep('ok')}else{Q.combo=0;Q.wrong.push(q);beep('bad')}
+  const ok=checkAnswer(q,val);Q.answered=true;Q.praise=pick(['Richtig! 🎉','Super! ✨','Genau so! 💪','Stark! 🔥']);Q.lastOk=ok;Q.picked=val;Q.typed=val;const key=q._key||Q.keys[0];Q.perKey[key]=Q.perKey[key]||{c:0,t:0};Q.perKey[key].t++;
+  if(ok){Q.correct++;Q.combo++;Q.bestCombo=Math.max(Q.bestCombo,Q.combo);Q.perKey[key].c++;beep('ok')}else{Q.combo=0;q._given=val;Q.wrong.push(q);beep('bad');if(Q.examId)fetchExplain(q)}
   render()}
 function finishQuiz(){
   const Q=S.quiz,d=S.data[S.kid],t=today();const total=Q.items.length;

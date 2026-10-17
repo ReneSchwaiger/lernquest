@@ -12,6 +12,7 @@ const VERSION = require('../package.json').version;
 const PORT = process.env.PORT || 8080;
 const FAMILY_PASSWORD = process.env.FAMILY_PASSWORD || '';
 const AI_DAILY_LIMIT = Number(process.env.AI_DAILY_LIMIT || 15);
+const AI_EXPLAIN_LIMIT = Number(process.env.AI_EXPLAIN_LIMIT || 60);
 const PARENT_MINUTES = Number(process.env.PARENT_MINUTES || 60);
 if (!FAMILY_PASSWORD) console.warn('[warn] FAMILY_PASSWORD ist nicht gesetzt – Anmeldung ist nicht möglich.');
 
@@ -92,7 +93,7 @@ app.get('/api/state', needFamily, (req, res) => {
   const kids = {};
   for (const id of Object.keys(KIDS)) kids[id] = k[id] || { rev: 0, data: null };
   const mats = {}; for (const id of Object.keys(KIDS)) mats[id] = materials.list(id);
-  res.json({ kids, materials: mats, settings: { books: s.books || DEFAULT_BOOKS, pinIsDefault: !!s.pinIsDefault }, ai: { enabled: ai.enabled(), limit: AI_DAILY_LIMIT, used: usage() } });
+  res.json({ kids, materials: mats, settings: { books: s.books || DEFAULT_BOOKS, pinIsDefault: !!s.pinIsDefault }, ai: { enabled: ai.enabled(), limit: AI_DAILY_LIMIT, explainLimit: AI_EXPLAIN_LIMIT, used: usage() } });
 });
 
 app.put('/api/kids/:id', needFamily, (req, res) => {
@@ -123,6 +124,25 @@ app.put('/api/settings', needParent, (req, res) => {
   }
   store.write('settings', s);
   res.json({ ok: true, books: s.books, pinIsDefault: s.pinIsDefault });
+});
+
+app.post('/api/ai/explain', needFamily, async (req, res) => {
+  if (!ai.enabled()) return res.status(503).json({ error: 'ai_disabled' });
+  const b = req.body || {};
+  if (!KIDS[b.kid] || !SUBJ[b.subj] || !b.question || b.correct == null || b.given == null) return res.status(400).json({ error: 'bad_request' });
+  const uk = b.kid + ':x';
+  if ((usage()[uk] || 0) >= AI_EXPLAIN_LIMIT) return res.status(429).json({ error: 'daily_limit' });
+  try {
+    const out = await ai.explain({
+      kid: b.kid, subj: b.subj, question: clip(b.question, 600), correct: clip(b.correct, 200), given: clip(b.given, 200), expl: clip(b.expl, 400),
+      options: Array.isArray(b.options) ? b.options.slice(0, 6).map(o => clip(o, 200)) : [],
+    });
+    countUse(uk);
+    res.json(out);
+  } catch (e) {
+    console.error('[ai explain]', e.message);
+    res.status(502).json({ error: 'ai_failed' });
+  }
 });
 
 /* ---------- Schularbeitsstoff (Uploads) ---------- */

@@ -210,3 +210,14 @@ th{color:var(--muted);font-weight:800}
 .mat-sum{background:var(--surface2);border-radius:14px;padding:10px 12px;margin-bottom:8px;font-size:.92rem}
 .mat-sum .chip.small{padding:2px 9px;font-size:.8rem;margin-top:6px}
 .upl{display:inline-flex;align-items:center;cursor:pointer}
+
+/* Fehler-Erklärung */
+.explain{margin-top:10px;background:var(--surface);border:2px dashed var(--line);border-radius:14px;padding:10px 12px;font-weight:600}
+.explain p{margin:4px 0}
+.explain ol{margin:6px 0 4px;padding-left:22px}
+.explain li{margin:2px 0}
+.explain .tip{color:var(--accentDeep);font-weight:800}
+.explain.loading{color:var(--muted);display:flex;gap:8px;align-items:center}
+.spinner.small{font-size:1.3rem}
+.wrongitem{padding-bottom:12px;border-bottom:1px solid var(--line)}
+.wrongitem:last-child{border-bottom:0}

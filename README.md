@@ -41,7 +41,7 @@ Aufgebaut wie **SIT-Time**: Frontend ohne Framework und ohne Build, Backend Node
 - `POST /api/parent/unlock`, `/api/parent/lock`
 - `GET /api/state`, `PUT /api/kids/:id`, `POST /api/kids/:id/reset` (Eltern)
 - `PUT /api/settings` (Eltern: Schulbücher, PIN)
-- `POST /api/ai/questions`
+- `POST /api/ai/questions`, `POST /api/ai/explain` (Fehler-Erklärung bei der Probe-Schularbeit)
 - `POST /api/materials/:kid/:examId/files` (Foto/PDF hochladen), `POST …/analyze` (Stoff auslesen), `DELETE /api/materials/:kid/:examId` (Eltern)
 - `GET /api/files/:id`, `DELETE /api/files/:id` (Eltern)
 - `GET /healthz` – Status, Version, KI an/aus
@@ -67,6 +67,7 @@ Aufgebaut wie **SIT-Time**: Frontend ohne Framework und ohne Build, Backend Node
 | `ANTHROPIC_BASE_URL` | Anderer kompatibler Endpunkt (z.B. Microsoft Foundry) | https://api.anthropic.com |
 | `ANTHROPIC_AUTH_HEADER` | Header-Name für den Key beim alternativen Endpunkt | x-api-key |
 | `AI_DAILY_LIMIT` | KI-Runden pro Kind und Tag | 15 |
+| `AI_EXPLAIN_LIMIT` | Fehler-Erklärungen (Probe-Schularbeit) pro Kind und Tag | 60 |
 | `PARENT_MINUTES` | Wie lange der Eltern-Modus offen bleibt | 60 |
 | `SESSION_DAYS` | Wie lange ein Gerät angemeldet bleibt | 180 |
 
